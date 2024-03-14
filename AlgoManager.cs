@@ -6,7 +6,12 @@ public static class AlgoManager
     public class Edge
     {
         public int v1, v2;
+        public int TargetLevel { get; set; }
 
+        public Edge(int targetLevel)
+        {
+            TargetLevel = targetLevel;
+        }
         public Edge(int v1, int v2)
         {
             this.v1 = v1;
@@ -17,11 +22,13 @@ public static class AlgoManager
     // Define the HierarchicalLevel class
     public class HierarchicalLevel
     {
-        public List<int> level;
+        public List<int> Level { get; set; }
+        public List<Edge> Edges { get; set; }
 
         public HierarchicalLevel()
         {
-            level = new List<int>();
+            Level = new List<int>();
+            Edges = new List<Edge>();
         }
     }
 
@@ -52,15 +59,15 @@ public static class AlgoManager
                     }
                 if (k == 0)
                 {
-                    HL[HL.Count - 1].level.Add(notUsedV[i]);
+                    HL[HL.Count - 1].Level.Add(notUsedV[i]);
                     notUsedV.RemoveAt(i);
                     i--;
                 }
             }
 
-            for (int j = 0; j < HL[HL.Count - 1].level.Count; j++)
+            for (int j = 0; j < HL[HL.Count - 1].Level.Count; j++)
             {
-                usedV.Add(HL[HL.Count - 1].level[j]);
+                usedV.Add(HL[HL.Count - 1].Level[j]);
             }
         }
     }
@@ -72,9 +79,9 @@ public static class AlgoManager
 
         for (int i = 0; i < HL.Count; i++)
         {
-            for (int j = 0; j < HL[i].level.Count; j++)
+            for (int j = 0; j < HL[i].Level.Count; j++)
             {
-                int vertex = HL[i].level[j];
+                int vertex = HL[i].Level[j];
 
                 for (int k = 0; k < adjacencyMatrix.GetLength(1); k++)
                 {
