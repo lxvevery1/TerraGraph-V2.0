@@ -1,207 +1,88 @@
-using System.Collections.Generic;
-using System.Text;
-using TMPro;
-using UnityEngine;
-using static IncidenceGenerator;
+п»їusing System.Collections.Generic;
 
-public class AlgoManager : MonoBehaviour
+public static class AlgoManager
 {
-    [SerializeField] private TMP_InputField adjacencyMatrixInputField;
-    [SerializeField] private TMP_InputField result;
-    [SerializeField] private TMP_InputField sortedGraphText;
-    [SerializeField] private ErrorMessage errorMessage;
-    
-    private int[,] adjacencyMatrix;
-    private Incidences incidences;
-
-
-    private void Awake()
+    // Define the Edge class
+    public class Edge
     {
-        adjacencyMatrixInputField.GetComponentInChildren<TMP_Text>().enableWordWrapping = false;
-    }
+        public int v1, v2;
 
-    private void Start()
-    {
-        // Выполнение топологической сортировки и присвоение порядковых номеров
-        Dictionary<int, int> vertexOrder = AssignOrder(ParseAdjacencyMatrix(adjacencyMatrixInputField.text));
-
-        // Вывод новых и старых номеров вершин
-        Debug.Log("Старый номер -> Новый номер");
-        foreach (var entry in vertexOrder)
+        public Edge(int v1, int v2)
         {
-            Debug.Log(entry.Key + " -> " + entry.Value);
-        }
-
-        // Представление нового графа с новыми номерами вершин
-        Debug.Log("Новый граф:");
-        for (int i = 0; i < adjacencyMatrix.GetLength(0); i++)
-        {
-            List<int> neighbors = GetNeighbors(adjacencyMatrix, i);
-            List<int> newNeighbors = new List<int>();
-            foreach (int neighbor in neighbors)
-            {
-                newNeighbors.Add(vertexOrder[neighbor]);
-            }
-            Debug.Log(vertexOrder[i] + " -> " + string.Join(", ", newNeighbors));
+            this.v1 = v1;
+            this.v2 = v2;
         }
     }
 
-
-    // Parse the adjacency matrix from the input field text
-    public int[,] ParseAdjacencyMatrix(string text)
+    // Define the HierarchicalLevel class
+    public class HierarchicalLevel
     {
-        string[] lines = text.Trim().Split('\n');
-        int numRows = lines.Length;
-        int numCols = lines[0].Trim().Split(' ').Length;
-        int[,] matrix = new int[numRows, numCols];
+        public List<int> level;
 
-        Debug.Log(numRows + ", " + numCols);
-
-        if (numRows != numCols)
+        public HierarchicalLevel()
         {
-            errorMessage.ThrowError("Adjacency matrix must be square (nxn)");
-            return null;
+            level = new List<int>();
         }
+    }
 
-        for (int i = 0; i < numRows; i++)
+    // Method to create hierarchical levels
+    public static void CreateHLevel(List<HierarchicalLevel> HL, int numberV, List<Edge> E) //numberV - РєРѕР»РёС‡РµСЃС‚РІРѕ РІРµСЂС€РёРЅ
+    {
+        List<int> usedV = new(); //СЃРїРёСЃРѕРє РІРµСЂС€РёРЅ, СѓР¶Рµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РІ РїРѕСЂСЏРґРєРѕРІРѕР№ С„СѓРЅРєС†РёРё
+
+        List<int> notUsedV = new(); //СЃРїРёСЃРѕРє РІРµСЂС€РёРЅ, РµС‰Рµ РЅРµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РІ РїРѕСЂСЏРґРєРѕРІРѕР№ С„СѓРЅРєС†РёРё
+
+        for (int i = 0; i < numberV; i++)
+            notUsedV.Add(i);
+
+        while (notUsedV.Count > 0)
         {
-            string[] rowValues = lines[i].Trim().Split(' ');
-            if (rowValues.Length != numCols)
+            HL.Add(new HierarchicalLevel());
+            for (int i = 0; i < notUsedV.Count; i++)
             {
-                errorMessage.ThrowError("Invalid number of elements in row " + (i + 1));
-                return null;
-            }
-
-            for (int j = 0; j < numCols; j++)
-            {
-                if (!int.TryParse(rowValues[j], out matrix[i, j]))
+                int k = 0;
+                for (int j = 0; j < E.Count; j++)
+                    if (E[j].v2 == notUsedV[i])
+                        k++; //СЃС‡РёС‚Р°РµРј РїРѕР»СѓСЃС‚РµРїРµРЅСЊ Р·Р°С…РѕРґР° РІРµСЂС€РёРЅС‹
+                for (int m = 0; m < usedV.Count; m++)
+                    for (int j = 0; j < E.Count; j++)
+                    {
+                        if (E[j].v1 == usedV[m] && E[j].v2 == notUsedV[i])
+                            k--; //РІС‹С‡РёС‚Р°РµРј РґСѓРіРё, РёС…РѕРґСЏС‰РёРµ РёР· РІРµСЂС€РёРЅ РїСЂРµРґС‹РґСѓС‰РёС… СѓСЂРѕРІРЅРµР№ Рё РІС…РѕРґСЏС‰РёРµ РІ РІРµСЂС€РёРЅСѓ i
+                    }
+                if (k == 0)
                 {
-                    errorMessage.ThrowError("Invalid element at row " + (i + 1) + ", column " + (j + 1));
-                    return null;
+                    HL[HL.Count - 1].level.Add(notUsedV[i]);
+                    notUsedV.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            for (int j = 0; j < HL[HL.Count - 1].level.Count; j++)
+            {
+                usedV.Add(HL[HL.Count - 1].level[j]);
+            }
+        }
+    }
+
+    // Method to convert adjacency matrix to ordered adjacency matrix
+    public static int[,] ConvertToOrderedAdjacencyMatrix(int[,] adjacencyMatrix, List<HierarchicalLevel> HL)
+    {
+        int[,] orderedAdjacencyMatrix = new int[adjacencyMatrix.GetLength(0), adjacencyMatrix.GetLength(1)];
+
+        for (int i = 0; i < HL.Count; i++)
+        {
+            for (int j = 0; j < HL[i].level.Count; j++)
+            {
+                int vertex = HL[i].level[j];
+
+                for (int k = 0; k < adjacencyMatrix.GetLength(1); k++)
+                {
+                    orderedAdjacencyMatrix[vertex, k] = adjacencyMatrix[vertex, k];
                 }
             }
         }
 
-        return matrix;
-    }
-
-
-    // Called when the "Generate" button is clicked
-    public void OnGenerateButtonClick()
-    {
-        string matrixText = adjacencyMatrixInputField.text;
-        adjacencyMatrix = ParseAdjacencyMatrix(matrixText);
-        if (adjacencyMatrix != null)
-        {
-            incidences = IncidenceGenerator.GenerateIncidenceLists(adjacencyMatrix);
-
-            SetIncidenceToText(incidences.right, ref result);
-
-            // Отображаем результат после топологической сортировки
-            SetSortedGraphText();
-        }
-    }
-
-
-    private void SetIncidenceToText(Dictionary<int, List<int>> incidence, ref TMP_InputField inputField)
-    {
-        StringBuilder stringBuilder = new();
-
-        foreach (var kvp in incidence)
-        {
-            stringBuilder.Append($"G({kvp.Key}) = {{");
-            for (int i = 0; i < kvp.Value.Count; i++)
-            {
-                stringBuilder.Append(kvp.Value[i]);
-                if (i < kvp.Value.Count - 1)
-                {
-                    stringBuilder.Append("; ");
-                }
-            }
-            stringBuilder.Append("}\n");
-        }
-
-        inputField.text = stringBuilder.ToString();
-    }
-
-    // Обновленный метод для отображения результата топологической сортировки
-    private void SetSortedGraphText()
-    {
-        // Выполнение топологической сортировки и присвоение порядковых номеров
-        Dictionary<int, int> vertexOrder = AssignOrder(adjacencyMatrix);
-
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.AppendLine("Новый граф:");
-        for (int i = 0; i < adjacencyMatrix.GetLength(0); i++)
-        {
-            List<int> neighbors = GetNeighbors(adjacencyMatrix, i);
-            List<int> newNeighbors = new List<int>();
-            foreach (int neighbor in neighbors)
-            {
-                newNeighbors.Add(vertexOrder[neighbor]);
-            }
-            stringBuilder.AppendLine($"{vertexOrder[i]} -> {string.Join(", ", newNeighbors)}");
-        }
-
-        sortedGraphText.text = stringBuilder.ToString(); // Отображаем результат в новом TMP_Text
-    }
-
-
-    // Функция присвоения порядковых номеров вершинам
-    private Dictionary<int, int> AssignOrder(int[,] matrix)
-    {
-        List<int> topologicalOrder = TopologicalSort(matrix);
-        Dictionary<int, int> vertexOrder = new Dictionary<int, int>();
-        for (int i = 0; i < topologicalOrder.Count; i++)
-        {
-            vertexOrder[topologicalOrder[i]] = i + 1; // Нумерация начинается с 1
-        }
-        return vertexOrder;
-    }
-
-    // Функция топологической сортировки
-    private List<int> TopologicalSort(int[,] matrix)
-    {
-        List<int> result = new List<int>();
-        HashSet<int> visited = new HashSet<int>();
-
-        for (int i = 0; i < matrix.GetLength(0); i++)
-        {
-            if (!visited.Contains(i))
-            {
-                DFS(matrix, i, visited, result);
-            }
-        }
-
-        result.Reverse(); // Результат обратного обхода - топологически упорядоченный список
-        return result;
-    }
-
-    // Обход в глубину для топологической сортировки
-    private void DFS(int[,] matrix, int vertex, HashSet<int> visited, List<int> result)
-    {
-        visited.Add(vertex);
-        for (int i = 0; i < matrix.GetLength(1); i++)
-        {
-            if (matrix[vertex, i] == 1 && !visited.Contains(i))
-            {
-                DFS(matrix, i, visited, result);
-            }
-        }
-        result.Add(vertex);
-    }
-
-    // Получение списка соседей вершины
-    private List<int> GetNeighbors(int[,] matrix, int vertex)
-    {
-        List<int> neighbors = new List<int>();
-        for (int i = 0; i < matrix.GetLength(1); i++)
-        {
-            if (matrix[vertex, i] == 1)
-            {
-                neighbors.Add(i);
-            }
-        }
-        return neighbors;
+        return orderedAdjacencyMatrix;
     }
 }

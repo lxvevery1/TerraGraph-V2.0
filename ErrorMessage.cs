@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using System;
 
-public class ErrorMessage : MonoBehaviour
+public class ErrorMessage : Singleton<ErrorMessage>
 {
     public event Action OnThrowErrorAction;
     public TMP_Text StreamableTextUI;
