@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using TMPro;
 using static AlgoManager;
 using System.Linq;
+using UnityEditor;
+using System.Text;
 
 /// Adjacency matrix #1
 /*
@@ -20,6 +22,7 @@ public class UIManager : MonoBehaviour
 {
     public TMP_InputField inputField;
     public TMP_InputField outputText;
+    public TMP_InputField leftIncidences;
 
     public void ProcessInput()
     {
@@ -48,13 +51,17 @@ public class UIManager : MonoBehaviour
                 }
             }
         }
-        Debug.Log(string.Join(", ", edges.Select(edge => $"({edge.v1+1}, {edge.v2+1})")));
+
+        LogEdges(edges);
+
         // Create hierarchical levels
         var levels = new List<HierarchicalLevel>();
         CreateHLevel(levels, lines.Length, edges);
 
+
         // Convert to ordered adjacency matrix
         int[,] orderedAdjacencyMatrix = new int[lines.Length, lines.Length];
+
 
         // normalizedLevels
         List<HierarchicalLevel> normalizedLevels = new();
@@ -73,27 +80,70 @@ public class UIManager : MonoBehaviour
         {
             for (int j = 0; j < normalizedSortedLevels[i].Level.Count; j++)
             {
-                var k = i + j;
                 normalizedSortedLevels[i].Level[j] = ordereredVert++;
             }
 
             Debug.Log($"normalizedSortedLevels[{i}].level = " + string.Join(',', normalizedSortedLevels[i].Level));
         }
 
-        // orderedAdjacencyMatrix = GetAdjacencyMatrixFromLevels(normalizedLevels);
+        List<List<VertsTransformation>> vertsTransformations = new List<List<VertsTransformation>>();
+
+        int n = normalizedLevels.Count;
+        while (n != 0)
+        {
+            vertsTransformations.Add(new List<VertsTransformation>());
+            --n;
+        }
+
+        for (int i = 0; i < levels.Count; i++)
+        {
+            for (int j = 0; j < normalizedSortedLevels[i].Level.Count; j++)
+            {
+                vertsTransformations[i].Add(new VertsTransformation() { Old = normalizedLevels[i].Level[j], New = normalizedSortedLevels[i].Level[j] });
+            }
+        }
+
+
+        List<VertsTransformation> vtransformations = new();
+        for (int i = 0; i < levels.Count; i++)
+        {
+            for (int j = 0; j < normalizedSortedLevels[i].Level.Count; j++)
+            {
+                vtransformations.Add(vertsTransformations[i][j]);
+            }
+        }
+        LogVertsTransformation(vtransformations);
+
+        var sortedEdges = GenerateSortedEdges(edges, vtransformations);
+        LogEdges(sortedEdges);
+
+
+        // lets calc the numb of links for each vert
+        List<int> nLinks = new();
+
+        foreach (HierarchicalLevel level in normalizedLevels)
+        {
+            int linksCount = level.Level.Count;
+
+            nLinks.Add(linksCount);
+        }
+
+        Debug.Log("nLinks = " + string.Join(", ", nLinks));
+
+
 
         // now we have {normalizedSortedLevels} -> go to the sorted adjacency matrix
         // ok, let's go)
-        // —оздаем пустую матрицу смежности
-        // «аполн€ем матрицу смежности на основе информации из списка иерархических уровней
-        for (int i = 0; i < normalizedLevels.Count; i++)
+
+        Dictionary<int, List<int>> vertLinks = LeftIncidence(adjacencyMatrix);
+        foreach (var entry in vertLinks)
         {
-            foreach (var edge in normalizedLevels[i].Edges)
-            {
-                int j = normalizedLevels.FindIndex(level => level.Level[i] == edge.TargetLevel);
-                orderedAdjacencyMatrix[i, j] = 1; // ”станавливаем 1, если есть св€зь между уровн€ми i и j
-            }
+            Debug.Log(entry.Key + " -> " + string.Join(", ", entry.Value));
         }
+
+        // orderedAdjacencyMatrix = ConvertToOrderedAdjacencyMatrix(vertsTransformations, vertLinks);
+        orderedAdjacencyMatrix = GenerateAdjacencyMatrix(sortedEdges);
+
 
 
         // Output the ordered adjacency matrix
@@ -108,42 +158,156 @@ public class UIManager : MonoBehaviour
         }
 
         outputText.text = output;
-    }
 
-    // ‘ункци€ дл€ получени€ матрицы смежности из списка уровней
-    public int[,] GetAdjacencyMatrixFromLevels(List<HierarchicalLevel> normalizedLevels)
-    {
-        // ќпредел€ем количество вершин на основе количества уровней
-        int vertexCount = 0;
-        foreach (var level in normalizedLevels)
+        SetIncidenceToText(vertLinks, ref leftIncidences);
+
+        outputText.text += "\n";
+        for (int i = 0; i < vtransformations.Count; i++)
         {
-            vertexCount += level.Level.Count;
+            outputText.text += ($"new {vtransformations[i].New}(old {vtransformations[i].Old})\n");
         }
-        Debug.Log(vertexCount);
-        // —оздаем пустую матрицу смежности
-        int[,] adjacencyMatrix = new int[vertexCount, vertexCount];
+    }
+    private static Dictionary<int, List<int>> LeftIncidence(int[,] adjacencyMatrix)
+    {
+        Debug.Log("==<b>Left</b> Incidence==");
 
-        // «аполн€ем матрицу смежности на основе св€зей между вершинами на разных уровн€х
-        int offset = 0; // —мещение дл€ правильной индексации вершин на разных уровн€х
-        for (int i = 0; i < normalizedLevels.Count - 1; i++)
+        int numNodes = adjacencyMatrix.GetLength(0);
+
+        Dictionary<int, List<int>> NEmap = new(numNodes);
+
+        for (int i = 0; i < numNodes; i++)
         {
-            foreach (var vertex1 in normalizedLevels[i].Level)
+            List<int> edges = new();
+            for (int j = 0; j < numNodes; j++)
             {
-                foreach (var vertex2 in normalizedLevels[i + 1].Level)
+                if (adjacencyMatrix[j, i] == 1)
                 {
-                    Debug.Log(vertex1 + " : " + vertex2);
-                    adjacencyMatrix[vertex1 + offset, vertex2 + offset] = 1;
-
-                    // adjacencyMatrix[vertex2 + offset, vertex1 + offset] = 1; // ≈сли граф неориентированный, то нужно установить и дл€ обратного ребра
+                    edges.Add(j + 1);
                 }
             }
-            Debug.Log("offset = " + offset);
-            offset += normalizedLevels[i].Level.Count; // ќбновл€ем смещение дл€ следующего уровн€
+            int node = i + 1;
+            NEmap.Add(node, edges);
+        }
+
+        return NEmap;
+    }
+
+    private List<Edge> GenerateSortedEdges(List<Edge> oldEdges, List<VertsTransformation> vertsTransformations)
+    {
+        List<Edge> newEdges = new();
+
+        // ѕроходимс€ по всем старым ребрам
+        foreach (Edge oldEdge in oldEdges)
+        {
+            int oldV1 = oldEdge.v1;
+            int oldV2 = oldEdge.v2;
+
+            // Ќаходим новый узел дл€ первой вершины ребра
+            int newV1 = FindNewVertex(oldV1+1, vertsTransformations);
+
+            // Ќаходим новый узел дл€ второй вершины ребра
+            int newV2 = FindNewVertex(oldV2+1, vertsTransformations);
+
+            // —оздаем новое ребро и добавл€ем его в список новых ребер
+            newEdges.Add(new Edge(newV1, newV2));
+        }
+
+        return newEdges;
+    }
+
+    // ћетод дл€ нахождени€ нового узла на основе старого и списка vertsTransformations
+    private int FindNewVertex(int oldVertex, List<VertsTransformation> vertsTransformations)
+    {
+        // ѕроходимс€ по всем уровн€м
+        foreach (VertsTransformation oldNewVerts in vertsTransformations)
+        {
+            if (oldNewVerts.Old == oldVertex)
+            {
+                // Debug.Log($"return oldNewVerts.New = {oldNewVerts.New-1}");
+                // ¬озвращаем новый узел
+                return oldNewVerts.New-1;
+            }
+        }
+
+        Debug.Log($"return oldVertex = {oldVertex}");
+        // ≈сли новый узел не найден, возвращаем старый
+        return oldVertex;
+    }
+
+    // ћетод дл€ генерации матрицы смежности на основе списка ребер
+    public static int[,] GenerateAdjacencyMatrix(List<Edge> edges)
+    {
+        int maxVertex = 0;
+        foreach (Edge edge in edges)
+        {
+            maxVertex = Mathf.Max(maxVertex, Mathf.Max(edge.v1+1, edge.v2+1));
+        }
+
+        Debug.Log($"Edges maxVertex = " + maxVertex);
+        int[,] adjacencyMatrix = new int[maxVertex, maxVertex];
+
+        foreach (Edge edge in edges)
+        {
+            Debug.Log($"Edge [edge.v1+1, edge.v2+1] = [{edge.v1+1}, {edge.v2+1}]");
+            adjacencyMatrix[edge.v1, edge.v2] = 1;
+            // adjacencyMatrix[edge.v2 - 1, edge.v1 - 1] = 1; // ≈сли граф неориентированный
         }
 
         return adjacencyMatrix;
     }
 
 
+
+
+    public struct VertsTransformation
+    {
+        public int Old;
+        public int New;
+    }
+
+    private static void LogVertsTransformation(List<List<VertsTransformation>> vertsTransformations)
+    {
+        for (int i = 0; i < vertsTransformations.Count; i++)
+        {
+            for (int j = 0; j < vertsTransformations[i].Count; j++)
+            {
+                Debug.Log($"new {vertsTransformations[i][j].New}(old {vertsTransformations[i][j].Old})");
+            }
+        }
+    }
+
+    private static void LogVertsTransformation(List<VertsTransformation> vertsTransformations)
+    {
+        for (int i = 0; i < vertsTransformations.Count; i++)
+        {
+            Debug.Log($"new {vertsTransformations[i].New}(old {vertsTransformations[i].Old})");
+        }
+    }
+
+    private static void LogEdges(List<Edge> edges)
+    {
+        Debug.Log(string.Join(", ", edges.Select(edge => $"({edge.v1 + 1}, {edge.v2 + 1})")));
+    }
+
+    private void SetIncidenceToText(Dictionary<int, List<int>> incidence, ref TMP_InputField inputField)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        foreach (var kvp in incidence)
+        {
+            stringBuilder.Append($"G({kvp.Key}) = {{");
+            for (int i = 0; i < kvp.Value.Count; i++)
+            {
+                stringBuilder.Append(kvp.Value[i]);
+                if (i < kvp.Value.Count - 1)
+                {
+                    stringBuilder.Append("; ");
+                }
+            }
+            stringBuilder.Append("}\n");
+        }
+
+        inputField.text = stringBuilder.ToString();
+    }
 
 }

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using UnityEngine;
 
 public static class AlgoManager
 {
@@ -6,12 +7,6 @@ public static class AlgoManager
     public class Edge
     {
         public int v1, v2;
-        public int TargetLevel { get; set; }
-
-        public Edge(int targetLevel)
-        {
-            TargetLevel = targetLevel;
-        }
         public Edge(int v1, int v2)
         {
             this.v1 = v1;
@@ -23,12 +18,9 @@ public static class AlgoManager
     public class HierarchicalLevel
     {
         public List<int> Level { get; set; }
-        public List<Edge> Edges { get; set; }
-
         public HierarchicalLevel()
         {
             Level = new List<int>();
-            Edges = new List<Edge>();
         }
     }
 
@@ -85,7 +77,8 @@ public static class AlgoManager
 
                 for (int k = 0; k < adjacencyMatrix.GetLength(1); k++)
                 {
-                    orderedAdjacencyMatrix[vertex, k] = adjacencyMatrix[vertex, k];
+                    Debug.Log("[vertex, k] = [" + vertex + ", " + k + "] ");
+                    orderedAdjacencyMatrix[vertex - 1, k] = adjacencyMatrix[vertex - 1, k];
                 }
             }
         }
