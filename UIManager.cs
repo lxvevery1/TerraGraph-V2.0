@@ -159,7 +159,9 @@ public class UIManager : MonoBehaviour
 
         outputText.text = output;
 
-        SetIncidenceToText(vertLinks, ref leftIncidences);
+        Dictionary<int, List<int>> sortedVertLinks = LeftIncidence(orderedAdjacencyMatrix);
+
+        SetIncidenceToText(sortedVertLinks, ref leftIncidences);
 
         outputText.text += "\n";
         for (int i = 0; i < vtransformations.Count; i++)
@@ -167,6 +169,7 @@ public class UIManager : MonoBehaviour
             outputText.text += ($"new {vtransformations[i].New}(old {vtransformations[i].Old})\n");
         }
     }
+
     private static Dictionary<int, List<int>> LeftIncidence(int[,] adjacencyMatrix)
     {
         Debug.Log("==<b>Left</b> Incidence==");
